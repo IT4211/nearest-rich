@@ -3,9 +3,7 @@ Classify malware source using rich header
 
 #### Running the program
 
-'''sh
 > python nearest_rich.py
-'''
 
 #### Dependent libraries
 
