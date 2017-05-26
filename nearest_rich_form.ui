@@ -26,16 +26,11 @@
    <string>nearest-rich</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QWidget" name="widget_matplotlib" native="true">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>761</width>
-      <height>481</height>
-     </rect>
-    </property>
-   </widget>
+   <layout class="QGridLayout" name="gridLayout_3">
+    <item row="1" column="0">
+     <widget class="matplotlibWidget" name="widget_matplotlib" native="true"/>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -58,7 +53,15 @@
     <property name="title">
      <string>Analysis</string>
     </property>
+    <widget class="QMenu" name="menuCompids">
+     <property name="title">
+      <string>Compids</string>
+     </property>
+     <addaction name="actionExport_CSV"/>
+     <addaction name="actionExport_SQLiteDB"/>
+    </widget>
     <addaction name="actionStart_Analysis"/>
+    <addaction name="menuCompids"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -94,6 +97,9 @@
     <layout class="QGridLayout" name="gridLayout">
      <item row="0" column="0">
       <widget class="QTableWidget" name="tableWidget_file">
+       <property name="editTriggers">
+        <set>QAbstractItemView::NoEditTriggers</set>
+       </property>
        <property name="alternatingRowColors">
         <bool>true</bool>
        </property>
@@ -116,6 +122,21 @@
        <column>
         <property name="text">
          <string>Path</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>mCV</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>ProdID</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Count</string>
         </property>
        </column>
       </widget>
@@ -173,7 +194,25 @@
     <string>Start Analysis</string>
    </property>
   </action>
+  <action name="actionExport_CSV">
+   <property name="text">
+    <string>Export CSV</string>
+   </property>
+  </action>
+  <action name="actionExport_SQLiteDB">
+   <property name="text">
+    <string>Export SQLiteDB</string>
+   </property>
+  </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>matplotlibWidget</class>
+   <extends>QWidget</extends>
+   <header>matplotlibwidgetFile</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
