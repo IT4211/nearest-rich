@@ -9,13 +9,13 @@ import csv
 import hashlib
 from PyQt4 import QtGui, QtCore
 from Logging import ForensicLog
+from SQLiteDB import *
 from matplotlibwidgetFile import SelectablePoint
 from nearest_rich_form import *
 from open_option_form import *
+from rich_view_form import *
 from richlibrary import *
 import diskimage
-
-import random
 
 # 디버깅 관련 메시지 출력
 import cgitb
@@ -27,20 +27,30 @@ except AttributeError:
     def _fromUtf8(s):
         return s
 
-class open_option(QtGui.QDialog):
+class OpenOption(QtGui.QDialog):
     def __init__(self, parent = None):
-        super(open_option, self).__init__(parent)
+        super(OpenOption, self).__init__(parent)
 
         self.ui_opt = Ui_Open_Option()
         self.ui_opt.setupUi(self)
         self.ui_opt.pushButton_OK.clicked.connect(self.ok)
         self.ui_opt.pushButton_CANCEL.clicked.connect(self.cancel)
+        self.exts = [self.ui_opt.radioButton_exe,
+               self.ui_opt.radioButton_dll,
+               self.ui_opt.radioButton_sys,
+               self.ui_opt.radioButton_lib]
+        # Default
+        self.exts[0].setChecked(True)
+        self.opt = None
 
     def ok(self):
-        pass
+        for ext in self.exts:
+            if ext.isChecked():
+                self.opt = ext.text()
+        self.close()
 
     def cancel(self):
-        return
+        self.close()
 
 class NearestRich(QtGui.QMainWindow):
 
@@ -61,9 +71,6 @@ class NearestRich(QtGui.QMainWindow):
         self.ui.tableWidget_file.cellDoubleClicked.connect(self.ItemClicked)
         # TODO: dock을 실수로 꺼버린 경우 다시 켤 수 있도록 View 메뉴 만들 것!
 
-    def _DrawChart(self):
-        pass
-
     def _Open(self):
 
         self.diskImg = QtGui.QFileDialog.getOpenFileName(self, "Open disk image file")
@@ -71,22 +78,44 @@ class NearestRich(QtGui.QMainWindow):
         if self.diskImg is None:
             return
         else:
+            #img = str(self.diskImg)
+            #pass
             img = unicode(self.diskImg)
             if img == u'':
                 return
+        # 정확히 디스크 이미지 파일을 지정했는지 검사
+        #
         self.ui.textEdit_status.insertPlainText(img + _fromUtf8(" 디스크 이미지 파일 탐색 중...\n"))
         # 옵션 다이얼로그
-
+        self.imgOption = OpenOption()
+        self.imgOption.exec_()
+        # 옵션을 선택하지 않고 닫거나 취소 버튼을 누른 경우 예외 처리
+        ext = self.imgOption.opt
+        if ext is None:
+            return
+        # 지정한 옵션에 맞는 cfg 파일 생성
 
         # 디스크 이미지가 존재하는 경로에 추출한 파일을 저장할 디렉토리 생성
         imgPath = os.path.split(img)[0]
-        os.mkdir(os.path.join(imgPath, 'extract_file'))
+        outDir = os.path.join(imgPath, 'output')
+        os.mkdir(outDir)
         case = diskimage.tsk(img)
-        #case.extract_directory_entry()
+        try:
+            case.LoadImage()                    # 디스크 이미지를 로드
+        except Exception as e:
+            self._WarningMessage(u"디스크 이미지를 로드할 수 없습니다.")
+            self.ui.textEdit_status.insertPlainText(img + _fromUtf8(" 디스크 이미지 파일을 읽어들일 수 없습니다.\n"))
+            self.ui.textEdit_status.insertPlainText(_fromUtf8("[-]ERROR: " + str(e) + "\n"))
+            os.rmdir(outDir)
+            return
+        case.SetConf()                      # 조건 값을 읽어들임
+        imgDir = case.OpenDirectory('/')    # 디스크 탐색을 시작, 시작 디렉토리를 지정
+        case.ListDirectory(imgDir, [], [])  # 조건에 맞는 목록을 구함
+        case.ExtractDirectoryEntry(False)   # 파일을 추출
         del case
 
         try:
-            fileNames = os.listdir(imgPath)
+            fileNames = os.listdir(outDir)
         except WindowsError as e:
             self._WarningMessage(str(e))
             exit(-1)
@@ -98,7 +127,7 @@ class NearestRich(QtGui.QMainWindow):
                 rowCount -= 1
 
             for fileName in fileNames:
-                filePath = os.path.join(imgPath, fileName)
+                filePath = os.path.join(outDir, fileName)
 
                 # 파일 목록 중 디렉토리가 존재하는 경우 continue
                 if os.path.isdir(filePath):
@@ -114,9 +143,9 @@ class NearestRich(QtGui.QMainWindow):
                         self.ui.tableWidget_file.setItem(self.rowPosition, 2, QtGui.QTableWidgetItem(_fromUtf8(filePath)))
                     else:
                         pass
-                except:
+                except Exception as e:
                     self.ui.textEdit_status.insertPlainText(_fromUtf8(fileName + " 파일을 읽는 도중 오류가 발생하였습니다.\n"))
-                    exit(-1)
+                    self.ui.textEdit_status.insertPlainText(_fromUtf8("[-]ERROR: " + str(e) + "\n"))
                 else:
                     fp.close()
             fileCount = self.ui.tableWidget_file.rowCount()
@@ -177,9 +206,12 @@ class NearestRich(QtGui.QMainWindow):
     def _StartAnalysis(self):
         self.ui.widget_matplotlib.canvas.axes.clear()
 
-        x = [1, 1.2, 3, 4, 5, 6]
-        y = [1, 1.2, 3, 4, 5, 6]
-        labels = ['1', '2', '3', '4', '5', '6']
+        self.x = [1, 2, 3, 4, 5, 6]
+        x = self.x
+        self.y = [1, 2, 3, 4, 5, 6]
+        y = self.y
+        self.labels = ['1', '2', '3', '4', '5', '6']
+        labels = self.labels
 
         self.sp = [SelectablePoint((x[i], y[i]), labels[i], self.ui.widget_matplotlib.canvas.fig) for i in range(len(x))]
         for i in range(len(x)):
@@ -233,7 +265,33 @@ class NearestRich(QtGui.QMainWindow):
         self.ui.textEdit_status.insertPlainText(_fromUtf8("CSV 파일 쓰기 완료\n"))
 
     def _ExportSQLiteDB(self):
-        pass
+        self.dbPath = QtGui.QFileDialog.getSaveFileName(self, "Save file as...", filter="db(*.db)")
+        dbPath = unicode(self.dbPath) # 한글 인코딩 처리
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("데이터베이스 생성 중...\n"))
+
+        db = sqlite_db(dbPath)
+        db.create_sqlite()
+
+        rowCount = self.ui.tableWidget_file.rowCount()
+        for i in range(0, rowCount):
+            fName = self.ui.tableWidget_file.item(i, 0)
+            fPath = self.ui.tableWidget_file.item(i, 2)
+            f = open(unicode(fPath.text()), 'rb')
+            rd = f.read()
+            md5 = hashlib.md5()
+            md5.update(rd)
+            hexmd5 = md5.hexdigest()
+            md5value = str(hexmd5.upper())
+            sha1 = hashlib.sha1()
+            sha1.update(rd)
+            hexsha1 = sha1.hexdigest()
+            sha1value = str(hexsha1.upper())
+            mcv = self.ui.tableWidget_file.item(i, 3)
+            pid = self.ui.tableWidget_file.item(i, 4)
+            cnt = self.ui.tableWidget_file.item(i, 5)
+            db.insert_sqlite(fName.text(), fPath.text(), md5value, sha1value, mcv.text(), cnt.text(), pid.text())
+
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("데이터베이스 생성 완료\n"))
 
     def _ParseRich(self, filepath):
         try:
@@ -260,21 +318,30 @@ class NearestRich(QtGui.QMainWindow):
         itemPath = unicode(itemPath) # unicode() 처리를 2번 해줌으로써 한글 인코딩 처리
         try:
             rh = parse(itemPath)
-            if type(rh) is not "dict":
-                raise Exception
-
+            if rh['err'] is not 0:
+                e = err2str(rh['err'])
+                raise Exception(e)
         except Exception as e:
-            #print str(e)
             self._WarningMessage(str(e))
         else:
-            print rh['cmpids']
-            # 파일 오픈해서 Rich Header 파싱 후
-            # 새로운 Dialog에서 출력
-            """
-            self.rich_view = rich_view()
-            self.rich_view.set~~~
-            self.rich_view.exec_()
-            """
+            # 파일 오픈해서 Rich Header 파싱 후 새로운 Dialog에서 출력
+            # Modeless Dialogs
+            rich_view = QtGui.QDialog(self)
+            rich_view.ui = Ui_Dialog_rich_view()
+            rich_view.ui.setupUi(rich_view)
+            rich_view.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+
+            for cmpid in rh['cmpids']:
+                mcv = cmpid['mcv']
+                cnt = cmpid['cnt']
+                pid = cmpid['pid']
+                rowPosition = rich_view.ui.tableWidget_rich_view.rowCount()
+                rich_view.ui.tableWidget_rich_view.insertRow(rowPosition)
+                rich_view.ui.tableWidget_rich_view.setItem(rowPosition, 0, QtGui.QTableWidgetItem(str(mcv)))
+                rich_view.ui.tableWidget_rich_view.setItem(rowPosition, 1, QtGui.QTableWidgetItem(str(cnt)))
+                rich_view.ui.tableWidget_rich_view.setItem(rowPosition, 2, QtGui.QTableWidgetItem(str(pid)))
+
+            rich_view.show()
 
     def _WarningMessage(self, msg):
         print "[Warning] ", msg

@@ -1,14 +1,12 @@
 #-*- coding: utf8 -*-
 
-#from win32file import SetFileTime, CreateFile, CreateDirectory, CloseHandle, error
-#from win32file import GENERIC_READ, GENERIC_WRITE, OPEN_EXISTING, CREATE_NEW
+from win32file import SetFileTime, CreateFile, CreateDirectory, CloseHandle, error
+from win32file import GENERIC_READ, GENERIC_WRITE, OPEN_EXISTING, CREATE_NEW
 
 import pytsk3 # raw image analysis and file system analysis
 import pyewf  # ewf iamge file processing
 import os
-import time
-#import _conf
-#import _effi
+import imgconf
 import cgitb
 cgitb.enable(format='text')
 
@@ -49,13 +47,13 @@ class tsk():
         self.extract_list = list()
         self.fullpath = list()
 
-    def loadimage(self):
+    def LoadImage(self):
         ewformat = ['.s01', '.E01', '.Ex01', '.e01']
         rawformat = ['.dd', '.raw', '.001']
         ext = os.path.splitext(self.url)
 
         if ext[1] in ewformat:
-            filenames = pyewf.glob(self.url)
+            filenames = pyewf.glob((self.url).decode('utf8'))
             ewf_handle = pyewf.handle()
             ewf_handle.open(filenames)
             img_info = ewf_Img_Info(ewf_handle)
@@ -65,13 +63,11 @@ class tsk():
             img_info = pytsk3.Img_Info(url = self.url)
             self.fs_info = pytsk3.FS_Info(img_info)
 
-    """
-    def setconf(self):
-        self.conf = _conf.extractconf()
+    def SetConf(self):
+        self.conf = imgconf.extractconf()
         self.condition = self.conf[0]
-    """
 
-    def list_directory(self, directory, stack=None, path_stack=None):
+    def ListDirectory(self, directory, stack=None, path_stack=None):
         stack.append(directory.info.fs_file.meta.addr)
 
         for directory_entry in directory:
@@ -87,7 +83,7 @@ class tsk():
                 continue
 
             # filtering
-            self.print_directory_entry(directory_entry, prefix=prefix, path_stack=path_stack)
+            self.PrintDirectoryEntry(directory_entry, prefix=prefix, path_stack=path_stack)
 
             if self._recursive:
                 try:
@@ -99,7 +95,7 @@ class tsk():
                     # This ensures that we don't recurse into a directory
                     # above the current level and thus avoid circular loops.
                     if inode not in stack:
-                        self.list_directory(sub_directory, stack, path_stack)
+                        self.ListDirectory(sub_directory, stack, path_stack)
 
                 except IOError:
                     pass
@@ -108,7 +104,7 @@ class tsk():
         if len(path_stack):
             path_stack.pop(-1)
 
-    def open_directory(self, inode_or_path):
+    def OpenDirectory(self, inode_or_path):
         inode = None
         path = None
         if inode_or_path is None:
@@ -126,7 +122,7 @@ class tsk():
 
         return directory
 
-    def print_directory_entry(self, directory_entry, prefix="", path_stack=list()):
+    def PrintDirectoryEntry(self, directory_entry, prefix="", path_stack=list()):
 
         meta = directory_entry.info.meta
         name = directory_entry.info.name
@@ -135,16 +131,11 @@ class tsk():
         if type(meta) != pytsk3.TSK_FS_META:
             return
 
-        mtime = time.ctime(meta.mtime)
-        atime = time.ctime(meta.atime)
-        ctime = time.ctime(meta.crtime)
-        etime = time.ctime(meta.ctime)
         size = meta.size
         path = "/".join(path_stack)
 
         #filter , false -> return
-        #TODO: 여기 조건식 부분을 수정해서, MZ시그니처를 가지는 파일들만 가져오는 것으로!
-        postfix = _conf.infix_to_postfix(self.condition[1])
+        postfix = imgconf.infix_to_postfix(self.condition[1])
 
         postfix = postfix.replace('mtime', str(meta.mtime))\
             .replace('atime', str(meta.atime))\
@@ -154,9 +145,10 @@ class tsk():
             .replace('size', str(size))\
             .replace('path', str(path))
 
-        if not _conf.search_condition(postfix):
-            #print "[debug : return]", name.name.decode('utf-8'), meta.mtime, size
+        if not imgconf.search_condition(postfix):
             return
+
+        maceTime = [meta.mtime, meta.atime, meta.crtime, meta.ctime]
 
         name_type = "-"
         if name:
@@ -166,15 +158,11 @@ class tsk():
         if meta:
             meta_type = self.META_TYPE_LOOKUP.get(int(meta.type), "-")
 
-        directory_entry_type = "{0:s}/{1:s}".format(name_type, meta_type)
-
         for attribute in directory_entry:
             inode_type = int(attribute.info.type)
             if inode_type in self.ATTRIBUTE_TYPES_TO_PRINT:
                 if self.fs_info.info.ftype in [
                     pytsk3.TSK_FS_TYPE_NTFS, pytsk3.TSK_FS_TYPE_NTFS_DETECT]:
-                    #inode = "{0:d}-{1:d}-{2:d}".format(
-                    #    meta.addr, int(attribute.info.type), attribute.info.id)
                     inode = "{0:d}".format(meta.addr)
                 else:
                     inode = "{0:d}".format(meta.addr)
@@ -186,25 +174,19 @@ class tsk():
                     filename = name.name
 
                 if meta and name:
-                   #print("{0:s}{1:s} {2:s}:\t{3:s}".format(
-                    #    prefix, directory_entry_type, inode, filename))
                     self.extract_list.append((inode, filename, maceTime, path))
 
     def debug_print_extlist(self):
         print self.extract_list
 
-    def extract_directory_entry(self, path_option):
+    def ExtractDirectoryEntry(self, path_option):
 
+        self.debug_print_extlist()
         for i in self.extract_list:
             f = self.fs_info.open_meta(inode = int(i[0]))
             name = i[1]
-            print name
-
             mace = i[2]
-            print mace
-
             path = i[3]
-            print path
 
             offset = 0
             size = f.info.meta.size
@@ -253,7 +235,6 @@ class tsk():
                 finally:
 
                     if f.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
-                        #dh = CreateDirectory(path, sa)
                         pass
                     else:
                         try:
