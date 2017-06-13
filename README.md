@@ -14,4 +14,5 @@ Classify malware source using rich header
 #### Reference
 
 - https://www.youtube.com/watch?v=ItT-PSw_hnY
-- korean encoding problem : http://blog.bluekyu.me/2011/07/pyqt-example-11.html
+- [Korean encoding problem](http://blog.bluekyu.me/2011/07/pyqt-example-11.htm)
+- [Tutorial To Implement k-Nearest Neighbors in Python From Scratch](http://machinelearningmastery.com/tutorial-to-implement-k-nearest-neighbors-in-python-from-scratch/)

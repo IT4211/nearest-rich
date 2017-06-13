@@ -124,11 +124,14 @@ class Ui_MainWindow(object):
         self.actionExport_CSV.setObjectName(_fromUtf8("actionExport_CSV"))
         self.actionExport_SQLiteDB = QtGui.QAction(MainWindow)
         self.actionExport_SQLiteDB.setObjectName(_fromUtf8("actionExport_SQLiteDB"))
+        self.actionDraw_plot = QtGui.QAction(MainWindow)
+        self.actionDraw_plot.setObjectName(_fromUtf8("actionDraw_plot"))
         self.menuFile.addAction(self.actionOpen)
         self.menuFile.addAction(self.actionOpen_Dir)
         self.menuFile.addAction(self.actionSave_As)
         self.menuCompids.addAction(self.actionExport_CSV)
         self.menuCompids.addAction(self.actionExport_SQLiteDB)
+        self.menuAnalysis.addAction(self.actionDraw_plot)
         self.menuAnalysis.addAction(self.actionStart_Analysis)
         self.menuAnalysis.addAction(self.menuCompids.menuAction())
         self.menuHelp.addAction(self.actionAbout)
@@ -167,5 +170,6 @@ class Ui_MainWindow(object):
         self.actionStart_Analysis.setText(_translate("MainWindow", "Start Analysis", None))
         self.actionExport_CSV.setText(_translate("MainWindow", "Export CSV", None))
         self.actionExport_SQLiteDB.setText(_translate("MainWindow", "Export SQLiteDB", None))
+        self.actionDraw_plot.setText(_translate("MainWindow", "Draw plot", None))
 
 from matplotlibwidgetFile import matplotlibWidget

@@ -63,9 +63,11 @@ class tsk():
             img_info = pytsk3.Img_Info(url = self.url)
             self.fs_info = pytsk3.FS_Info(img_info)
 
-    def SetConf(self):
-        self.conf = imgconf.extractconf()
-        self.condition = self.conf[0]
+        else:
+            raise Exception("It is not a disk image extension.")
+
+    def SetConf(self, opt):
+        self.conf = opt
 
     def ListDirectory(self, directory, stack=None, path_stack=None):
         stack.append(directory.info.fs_file.meta.addr)
@@ -135,7 +137,7 @@ class tsk():
         path = "/".join(path_stack)
 
         #filter , false -> return
-        postfix = imgconf.infix_to_postfix(self.condition[1])
+        postfix = imgconf.infix_to_postfix(self.conf)
 
         postfix = postfix.replace('mtime', str(meta.mtime))\
             .replace('atime', str(meta.atime))\
@@ -181,6 +183,7 @@ class tsk():
 
     def ExtractDirectoryEntry(self, path_option):
 
+
         self.debug_print_extlist()
         for i in self.extract_list:
             f = self.fs_info.open_meta(inode = int(i[0]))
@@ -190,7 +193,7 @@ class tsk():
 
             offset = 0
             size = f.info.meta.size
-            print "size: ", size
+            #print "size: ", size
             #BUFF_SIZE = 800000000 #1024 * 1024
 
             while offset < size:
@@ -220,7 +223,10 @@ class tsk():
                     else:
                         if f.info.meta.type == pytsk3.TSK_FS_META_TYPE_DIR:
                             path = os.path.join("./output/", name).decode('utf-8')
-                            os.mkdir(path)
+                            try:
+                                os.mkdir(path)
+                            except WindowsError as e:
+                                print e
                         else:
                             filename = os.path.join("./output/", name).decode('utf-8')
                             output = open(filename, "w")

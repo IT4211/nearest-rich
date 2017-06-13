@@ -31,7 +31,7 @@
   <property name="windowTitle">
    <string>Diskimage Option</string>
   </property>
-  <widget class="QGroupBox" name="groupBox">
+  <widget class="QGroupBox" name="groupBox_extenstion">
    <property name="geometry">
     <rect>
      <x>20</x>

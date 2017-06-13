@@ -13,23 +13,19 @@ class sqlite_db:
         sql = "CREATE TABLE IF NOT EXISTS richdrs(" \
               "Filename text, " \
               "Filepath text, " \
-              "Hash(MD5) text, " \
-              "Hash(SHA1) text, " \
+              "MD5 text, " \
+              "SHA1 text, " \
               "mCV text, " \
-              "Count int, " \
+              "Count text, " \
               "ProdID text)"
         cursor.execute(sql)
 
-    def ins_sqlite(self, fname, fpath, md5, sha1, compids):
+    def insert_sqlite(self, fname, fpath, md5, sha1, mcv, cnt, pid):
         con = sqlite3.connect(self.path)
         con.text_factory = str()
         cursor = con.cursor()
 
-        mCV = compids['mcv']
-        Count = compids['cnt']
-        ProdID = compids['pid']
-
-        cursor.execute("INSERT INTO richdrs VALUES(?, ?, ?, ?, ?, ?, ?)",
-                       (fname, fpath, md5, sha1, mCV, Count, ProdID))
+        cursor.execute("INSERT INTO richdrs VALUES(?,?,?,?,?,?,?)",
+                       (str(unicode(fname).encode('utf8')), str(unicode(fpath).encode('utf8')), md5, sha1, str(mcv), str(cnt), str(pid)))
         con.commit()
         con.close()

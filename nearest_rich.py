@@ -15,11 +15,14 @@ from nearest_rich_form import *
 from open_option_form import *
 from rich_view_form import *
 from richlibrary import *
+from kNNlibrary import *
 import diskimage
 
 # 디버깅 관련 메시지 출력
 import cgitb
 cgitb.enable(format='text')
+
+rncon = lambda x: (x / 100) + ((x % 100) * 0.01)
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -46,7 +49,7 @@ class OpenOption(QtGui.QDialog):
     def ok(self):
         for ext in self.exts:
             if ext.isChecked():
-                self.opt = ext.text()
+                self.opt = str(ext.text())
         self.close()
 
     def cancel(self):
@@ -61,6 +64,7 @@ class NearestRich(QtGui.QMainWindow):
         self.ui.setupUi(self)
         self.ui.actionOpen.triggered.connect(self._Open)
         self.ui.actionOpen_Dir.triggered.connect(self._OpenDir)
+        self.ui.actionDraw_plot.triggered.connect(self._DrawPlot)
         self.ui.actionStart_Analysis.triggered.connect(self._StartAnalysis)
         self.ui.actionExport_CSV.triggered.connect(self._ExportCSV)
         self.ui.actionExport_SQLiteDB.triggered.connect(self._ExportSQLiteDB)
@@ -72,20 +76,19 @@ class NearestRich(QtGui.QMainWindow):
         # TODO: dock을 실수로 꺼버린 경우 다시 켤 수 있도록 View 메뉴 만들 것!
 
     def _Open(self):
+        # 상태창을 전부 클리어
+        self.ui.textEdit_status.clear()
 
         self.diskImg = QtGui.QFileDialog.getOpenFileName(self, "Open disk image file")
         # 디스크 이미지를 선택하지 않고 창을 닫거나 확인을 누른 경우
         if self.diskImg is None:
             return
         else:
-            #img = str(self.diskImg)
-            #pass
             img = unicode(self.diskImg)
             if img == u'':
                 return
-        # 정확히 디스크 이미지 파일을 지정했는지 검사
-        #
-        self.ui.textEdit_status.insertPlainText(img + _fromUtf8(" 디스크 이미지 파일 탐색 중...\n"))
+
+        self.ui.textEdit_status.insertPlainText(img + _fromUtf8(" 디스크 이미지 파일 로드가 정상적으로 완료되었습니다.\n"))
         # 옵션 다이얼로그
         self.imgOption = OpenOption()
         self.imgOption.exec_()
@@ -93,8 +96,8 @@ class NearestRich(QtGui.QMainWindow):
         ext = self.imgOption.opt
         if ext is None:
             return
-        # 지정한 옵션에 맞는 cfg 파일 생성
-
+        opt = '(ext == ".' + ext[0:3] + '")'
+        self.ui.textEdit_status.insertPlainText(img + _fromUtf8(" 디스크 이미지 파일 탐색 중...\n"))
         # 디스크 이미지가 존재하는 경로에 추출한 파일을 저장할 디렉토리 생성
         imgPath = os.path.split(img)[0]
         outDir = os.path.join(imgPath, 'output')
@@ -105,10 +108,11 @@ class NearestRich(QtGui.QMainWindow):
         except Exception as e:
             self._WarningMessage(u"디스크 이미지를 로드할 수 없습니다.")
             self.ui.textEdit_status.insertPlainText(img + _fromUtf8(" 디스크 이미지 파일을 읽어들일 수 없습니다.\n"))
-            self.ui.textEdit_status.insertPlainText(_fromUtf8("[-]ERROR: " + str(e) + "\n"))
+            if e is not "":
+                self.ui.textEdit_status.insertPlainText(_fromUtf8("[-]ERROR: " + str(e) + "\n"))
             os.rmdir(outDir)
             return
-        case.SetConf()                      # 조건 값을 읽어들임
+        case.SetConf(opt)                      # 조건 값을 읽어들임
         imgDir = case.OpenDirectory('/')    # 디스크 탐색을 시작, 시작 디렉토리를 지정
         case.ListDirectory(imgDir, [], [])  # 조건에 맞는 목록을 구함
         case.ExtractDirectoryEntry(False)   # 파일을 추출
@@ -152,6 +156,8 @@ class NearestRich(QtGui.QMainWindow):
             self.ui.textEdit_status.insertPlainText(_fromUtf8("분석 대상 파일 " + str(fileCount) + "개를 모두 읽어들였습니다.\n"))
 
     def _OpenDir(self):
+        # 상태창을 전부 클리어
+        self.ui.textEdit_status.clear()
         # PE 파일 세트가 존재하는 디렉토리 경로
         self.directory = QtGui.QFileDialog.getExistingDirectory(self, "Select directory")
         dir = unicode(self.directory) # 한글 인코딩 처리
@@ -186,6 +192,7 @@ class NearestRich(QtGui.QMainWindow):
                         self.rowPosition = self.ui.tableWidget_file.rowCount()
                         self.ui.tableWidget_file.insertRow(self.rowPosition)
                         self.ui.tableWidget_file.setItem(self.rowPosition, 0, QtGui.QTableWidgetItem(_fromUtf8(fileName)))
+                        self.ui.tableWidget_file.setItem(self.rowPosition, 1, QtGui.QTableWidgetItem(_fromUtf8(fileName)[:4]))
                         self.ui.tableWidget_file.setItem(self.rowPosition, 2, QtGui.QTableWidgetItem(_fromUtf8(filePath)))
                         # 마지막 compid 파싱
                         mCV, ProdID, Count = self._ParseRich(filePath)
@@ -203,21 +210,91 @@ class NearestRich(QtGui.QMainWindow):
             fileCount = self.ui.tableWidget_file.rowCount()
             self.ui.textEdit_status.insertPlainText(_fromUtf8("분석 대상 파일 " + str(fileCount) + "개를 모두 읽어들였습니다.\n"))
 
-    def _StartAnalysis(self):
-        self.ui.widget_matplotlib.canvas.axes.clear()
+    def _DrawPlot(self):
+        x = list()
+        y = list()
+        labels = list()
+        # self.ui.widget_matplotlib.canvas.axes.clear()
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("읽어들인 파일 목록에서 @comp.id 처리 중..\n"))
+        rowCount = self.ui.tableWidget_file.rowCount()
+        for row in range(rowCount):
+            try:
+                mcv = int(self.ui.tableWidget_file.item(row, 3).text())
+                pid = int(self.ui.tableWidget_file.item(row, 4).text())
+                label = str(self.ui.tableWidget_file.item(row, 0).text())
+            except ValueError:
+                continue
+            else:
+                x.append(rncon(mcv))
+                y.append(pid)
+                labels.append(label)
 
-        self.x = [1, 2, 3, 4, 5, 6]
-        x = self.x
-        self.y = [1, 2, 3, 4, 5, 6]
-        y = self.y
-        self.labels = ['1', '2', '3', '4', '5', '6']
-        labels = self.labels
 
         self.sp = [SelectablePoint((x[i], y[i]), labels[i], self.ui.widget_matplotlib.canvas.fig) for i in range(len(x))]
         for i in range(len(x)):
             self.ui.widget_matplotlib.canvas.axes.add_artist(self.sp[i].point)
 
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("@comp.id 분석이 완료되었습니다.\n"))
         self.ui.widget_matplotlib.canvas.draw()
+        return
+
+    def _StartAnalysis(self):
+        self._DrawPlot()
+        # 트레이닝 셋으로 불려진 rich 헤더를 csv 형태로 출력
+        self._GenerateDataSet('train.data')
+        # 테스트 셋을 불러드린다.
+        self._OpenDir()
+        # 테스트 셋으로 불려진 rich 헤더를 csv 형태로 출력
+        self._DrawPlot()
+        self._GenerateDataSet('rich.data')
+
+        # 상태창을 전부 클리어
+        self.ui.textEdit_status.clear()
+
+        trainingSet = []
+        testSet = []
+        loadDataset('train.data', 'rich.data', trainingSet, testSet)
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("트레이닝 셋: ") + repr(len(trainingSet)) + '\n')
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("테스트 셋: ") + repr(len(testSet)) + '\n')
+
+        predictions = []
+        k = 5
+        for x in range(len(testSet)):
+            neighbors = getNeighbors(trainingSet, testSet[x], k)
+            result = getResponse(neighbors)
+            predictions.append(result)
+            self.ui.textEdit_status.insertPlainText(_fromUtf8('> 예측한 제작 환경=') + repr(result) + _fromUtf8(', 실제 제작 환경=') + repr(testSet[x][-1])+ '\n')
+            #print('> predicted=' + repr(result) + ', actual=' + repr(testSet[x][-1]))
+        accuracy = getAccuracy(testSet, predictions)
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("정확도: ") + repr(accuracy) + '%' + '\n')
+        #print('Accuracy: ' + repr(accuracy) + '%')
+
+    def _GenerateDataSet(self, fn):
+        # rich 헤더를 csv 형태로 출력
+        cwd = os.getcwd()
+        trainingCSV = os.path.join(cwd, fn)
+        trainingCSV = unicode(trainingCSV)
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("데이터 CSV 생성 중...\n"))
+        with open(trainingCSV, 'wb') as csvStream:
+            writer = csv.writer(csvStream, delimiter=',', quoting=csv.QUOTE_ALL)
+            for row in range(self.ui.tableWidget_file.rowCount()):
+                rowData = []
+                ver = str(self.ui.tableWidget_file.item(row, 1).text())
+                if ver == '':
+                    ver = 0
+                mcv = str(self.ui.tableWidget_file.item(row, 3).text())
+                pid = str(self.ui.tableWidget_file.item(row, 4).text())
+                cnt = str(self.ui.tableWidget_file.item(row, 5).text())
+                if (mcv == '-') or (pid == '-') or (cnt == '-'):
+                    continue
+                rowData.append(int(mcv))
+                rowData.append(int(pid))
+                rowData.append(int(cnt))
+                rowData.append(ver)
+
+                writer.writerow(rowData)
+
+        self.ui.textEdit_status.insertPlainText(_fromUtf8("데이터 CSV 생성 완료...\n"))
 
     def _ExportCSV(self):
         self.csvPath = QtGui.QFileDialog.getSaveFileName(self, "Save file as...", filter="CSV(*.csv)")

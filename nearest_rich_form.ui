@@ -60,6 +60,7 @@
      <addaction name="actionExport_CSV"/>
      <addaction name="actionExport_SQLiteDB"/>
     </widget>
+    <addaction name="actionDraw_plot"/>
     <addaction name="actionStart_Analysis"/>
     <addaction name="menuCompids"/>
    </widget>
@@ -202,6 +203,11 @@
   <action name="actionExport_SQLiteDB">
    <property name="text">
     <string>Export SQLiteDB</string>
+   </property>
+  </action>
+  <action name="actionDraw_plot">
+   <property name="text">
+    <string>Draw plot</string>
    </property>
   </action>
  </widget>

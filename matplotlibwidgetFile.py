@@ -5,10 +5,9 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.patches import Circle
 
-
 class SelectablePoint:
     def __init__(self, xy, label, fig):
-        self.point = Circle( (xy[0], xy[1]), 0.15, figure=fig)
+        self.point = Circle((xy[0], xy[1]), 3, facecolor='none', edgecolor='r', figure=fig)
         self.label = label
         self.cidpress = self.point.figure.canvas.mpl_connect('button_press_event', self.onClick)
 
@@ -26,10 +25,9 @@ class ScatterPlot(FigureCanvas):
         FigureCanvas.setSizePolicy(self, QtGui.QSizePolicy.Expanding,QtGui.QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
 
-
         self.axes = self.fig.add_subplot(111)
-        xlim = [0,10]
-        ylim = [0,10]
+        xlim = [0,800]
+        ylim = [0,400]
         self.axes.set_xlim(xlim)
         self.axes.set_ylim(ylim)
         self.axes.set_aspect( 1 )

@@ -1,3 +1,5 @@
+#-*- coding: utf8 -*-
+
 import sys, struct
 
 SIZE_DOS_HEADER = 0x40
@@ -10,7 +12,7 @@ def parse(fname):
 
     dat = open(fname, 'rb').read()
 
-    ## Do basic sanity checks on the PE
+    # PE 헤더 체크
     if dat[0:][:2] != b'MZ':
         return {'err': -2}
 
@@ -18,9 +20,7 @@ def parse(fname):
     if dat[e_lfanew:][:2] != b'PE':
         return {'err': -3}
 
-    ## IMPORTANT: Do not assume the data to start at 0x80, this is not always
-    ## the case (modified DOS stub). Instead, start searching backwards for
-    ## 'Rich', stop at beginning of DOS header.
+    # 'Rich' 문자열을 찾음
     rich = 0
     for rich in range(e_lfanew, SIZE_DOS_HEADER, -1):
         if dat[rich:][:4] == b'Rich':
@@ -29,11 +29,9 @@ def parse(fname):
     if rich == SIZE_DOS_HEADER:
         return {'err': -4}
 
-    ## We found a valid 'Rich' signature in the header from here on
     csum = u32(dat[rich + 4:][:4])
 
-    ## xor backwards with csum until either 'DanS' or end of the DOS header,
-    ## invert the result to get original order
+    # 'DanS' 문자열을 만나기 전까지 체크섬 값으로 XOR 연산을 수행
     upack = [ u32(dat[i:][:4]) ^ csum for i in range(rich - 4, SIZE_DOS_HEADER, -4) ][::-1]
     if u32(b'DanS') not in upack:
         return {'err': -5}
@@ -41,7 +39,7 @@ def parse(fname):
     upack = upack[upack.index(u32(b'DanS')):]
     dans = e_lfanew - len(upack) * 4 - (e_lfanew - rich)
 
-    ## DanS is _always_ followed by three zero dwords
+    ## DanS는 항상 뒤에 0과 함께 존재
     if not all([upack[i] == 0 for i in range(1, 4)]):
         return {'err': -6}
 
@@ -52,10 +50,9 @@ def parse(fname):
 
     cmpids = []
 
-    ## Bonus feature: Calculate and check the check sum csum
     chk = dans
     for i in range(dans):
-        ## Mask out the e_lfanew field as it's not initialized yet
+
         if i in range(0x3c, 0x40):
             continue
         chk += rol32(ord(dat[i]), i)
@@ -74,11 +71,8 @@ def parse(fname):
             'cnt': (upack[i + 1] >>  0)
         })
 
-        ## Exclude the "generic file" descriptor from the check sum
-        #if cmpids[-1]['mcv'] & 0xffff != 0:
         chk += rol32(upack[i + 0], upack[i + 1])
 
-    ## Truncate calculated checksum to 32 bit
     chk &= 0xffffffff
 
     return {'err': 0, 'cmpids': cmpids, 'csum_calc': chk, 'csum_file': csum,
