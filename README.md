@@ -1,5 +1,5 @@
 # nearest-rich
-Classify malware source using rich header
+Classifier with rich header
 
 #### Running the program
 
